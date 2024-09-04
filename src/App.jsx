@@ -1,43 +1,29 @@
 import { useState } from 'react'
 
-// Function to check if a given sudoku board is valid
-const boardIsValid = (board) => {
-  // Check if there are any duplicates in each large square
-  for (const largeSquare of board) {
-    let seenNums = [];
-    for (const num of largeSquare) {
-      if (seenNums.includes(num)) {
-        return false;
-      } else if (num !== 0) {
-        seenNums += [num];
-      }
+// Function to check if a given number can be placed at a given position on the sudoku grid
+const canPlace = (board, largeSquareIndex, smallSquareIndex, num) => {
+  const largeSquareRowNumber = Math.floor(largeSquareIndex / 3);
+  const smallSquareRowNumber = Math.floor(smallSquareIndex / 3)
+  const largeSquareColumnNumber = (largeSquareIndex % 3);
+  const smallSquareColumnNumber = (smallSquareIndex % 3);
+  // Check if num appears in same large square as position provided
+  for (let i=0; i<9; i++) {
+    if (board[largeSquareIndex][i] === num) {return false}
+  }
+  // Check if num appears in same row as position provided
+  for (let i=0; i<3; i++) {
+    for (let j=0; j<3; j++) {
+      if (board[largeSquareRowNumber * 3 + i][smallSquareRowNumber * 3 + j] === num) {return false}
     }
   }
-  // Check if there are any duplicates in each column
-  for (let columnNumber = 0; columnNumber < 9; columnNumber++) {
-    let seenNums = [];
-    for (let rowNumber = 0; rowNumber < 9; rowNumber++) {
-      const currSquareValue =  board[3 * Math.floor(rowNumber / 3) + Math.floor(columnNumber / 3)][3 * (rowNumber % 3) + (columnNumber % 3)];
-      if (seenNums.includes(currSquareValue)) {
-        return false;
-      } else if (currSquareValue !== 0) {
-        seenNums += [currSquareValue];
-      }
-    } 
-  }
-  // Check if there are any duplicates in each row
-  for (let rowNumber = 0; rowNumber < 9; rowNumber++) {
-    let seenNums = [];
-    for (let columnNumber = 0; columnNumber < 9; columnNumber++) {
-      const currSquareValue =  board[3 * Math.floor(rowNumber / 3) + Math.floor(columnNumber / 3)][3 * (rowNumber % 3) + (columnNumber % 3)];
-      if (seenNums.includes(currSquareValue)) {
-        return false;
-      } else if (currSquareValue !== 0) {
-        seenNums += [currSquareValue];
-      }
+  // Check if num appears in same column as position provided
+  for (let i=0; i<9; i += 3) {
+    for (let j=0; j<9; j += 3) {
+      if (board[largeSquareColumnNumber + i][smallSquareColumnNumber + j] === num) {return false}
     }
   }
-  return true;
+  console.log(num)
+  return true
 }
 
 function Square({value, handleChange}) {
@@ -48,17 +34,29 @@ function App() {
   // Store current state of board (a 0 implies a blank square)
   const [board, setBoard] = useState([[0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0]])
 
+  // Store state for text to be displayed at top of screen
+  const [topText, setTopText] = useState('');
+
+  // Store list of solutions for current board
+  let solutions = [];
+
   // Function to update a given square of the board
   const updateSquare = (largeSquareIndex, smallSquareIndex, value) => {
     // Check value is valid
     if (/^[1-9]$/.test(value) || value === '') {
-      // Create copy of board and edit correct value
-      const boardCopy = board.slice();
-      const rowCopy = board[largeSquareIndex].slice();
-      rowCopy[smallSquareIndex] = parseInt(value) || 0;
-      boardCopy[largeSquareIndex] = rowCopy;
+      // Check if value can be placed in desired square
+      if (canPlace(board, largeSquareIndex, smallSquareIndex, parseInt(value))) {
+        // Create copy of board and edit correct value
+        const boardCopy = board.slice();
+        const rowCopy = board[largeSquareIndex].slice();
+        rowCopy[smallSquareIndex] = parseInt(value) || 0;
+        boardCopy[largeSquareIndex] = rowCopy;
 
-      setBoard(boardCopy);
+        setBoard(boardCopy);
+      } else {
+        // Display error
+        setTopText(`${value} can not be placed here`);
+      }
     }
   }
 
@@ -67,92 +65,56 @@ function App() {
 
   }
 
-  // // Function to solve a given sudoku board and check if there are multiple solutions
-  // const solve = (currBoard) => {
-  //   // If currBoard is invalid return immediately
-  //   if (!boardIsValid(currBoard)) {
-  //     return
-  //   }
-  //   // Find the earliest square in board which has not been filled yet
-  //   for (let i=0; i<9; i++) {
-  //     for (let j=0; j<9; j++) {
-  //       if (board[i][j] === 0) {
-  //         for (let newValue=1; newValue<=9; newValue++) {
-  //           const boardCopy = board.slice();
-  //           const rowCopy = board[i].slice();
-  //           rowCopy[j] = newValue;
-  //           boardCopy[i] = rowCopy;
-  //           solve(boardCopy);
-  //         }
-  //       }
-  //     }
-  //   }
-  //   console.log(currBoard);
-  //   return currBoard;
-  // }
-
-  const solve = () => {
-    // Track number of squares on board which have been filled
-    let filledSquares = 0;
-
-    const boardCopy = [[],[],[],[],[],[],[],[],[]];
-    let secondBoardCopy = [[],[],[],[],[],[],[],[],[]];
-    for (let i=0; i<9; i++) {
-      boardCopy[i] = board[i].slice();
-      secondBoardCopy[i] = board[i].slice();
-      for(let j=0; j<9; j++) {
-        if (boardCopy[i][j] !==0) {
-          filledSquares += 1;
-        }
-      }
-    }
-
-    // Keep list of most recently filled squares
-    let lastFilledSquares = [];
-    
-    // Loop until board is completely filled
-    while (filledSquares < 81) {
-      // Find first unfilled square
-      let foundSquare = false;
+  // Function to solve a given sudoku board and check if there are multiple solutions
+  const solve = (currBoard, wantOnlyOneSolution = false) => {
+    // Check if we have a solution and can finish early
+    if (!(wantOnlyOneSolution && solutions.length >= 1)) {
+      // Find the earliest square in board which has not been filled yet
       for (let i=0; i<9; i++) {
         for (let j=0; j<9; j++) {
-          if (!foundSquare && boardCopy[i][j] === 0){
-            foundSquare = true;
-            filledSquares += 1;
-            lastFilledSquares.unshift([i,j]);
+          if (currBoard[i][j] === 0) {
+            for (let newValue=1; newValue<=9; newValue++) {
+              // Check if newValue can be placed in desired position
+              if (canPlace(currBoard, i, j, newValue)) {
+                currBoard[i][j] = newValue;
+                solve(currBoard , wantOnlyOneSolution);
+              }
+            }
+            currBoard[i][j] = 0;
+            return
           }
         }
       }
-      let lastFilledSquare = lastFilledSquares[0];
-      let newValue = 0;
-      // Find a value which can be placed in this square whilst keeping board valid
-      for (let num=1; num<=9; num++) {
-        if (newValue === 0) {
-          boardCopy[lastFilledSquare[0]][lastFilledSquare[1]] = num;
-            if (boardIsValid(boardCopy)) {
-              newValue = num;
-            }
-          }
-        }
-        // If we havent found a value that works we remove last filled squares until we find a square which we can increase its value by one
-        while (newValue === 0 && !boardIsValid(boardCopy)) {
-          lastFilledSquare = lastFilledSquares[0];
-          // Check if value in this square can be incremented
-          if (boardCopy[lastFilledSquare[0]][lastFilledSquare[1]] < 9) {
-            boardCopy[lastFilledSquare[0]][lastFilledSquare[1]] += 1;
-          } 
-          // If not empty square and remove from list of filled squares
-          else {
-            while (boardCopy[lastFilledSquares[0][0]][lastFilledSquares[0][1]] === 9) {
-              filledSquares -= 1;
-              boardCopy[lastFilledSquares[0][0]][lastFilledSquares[0][1]] = 0;
-              lastFilledSquares.shift();
-            }
-            boardCopy[lastFilledSquares[0][0]][lastFilledSquares[0][1]] += 1;
-          }
-        }
+      // If we reach this point then currBoard will be fully solved so create a copy and store it
+      let boardCopy = [];
+      for (let i=0; i<9; i++) {
+        boardCopy.push(currBoard[i].slice());
+      }
+      solutions.push(boardCopy);
+    } 
+  }
+
+  // Function to be ran when solve button pressed
+  const solveButton = () => {
+    // Reset solutions list
+    solutions = [];
+    // Create a copy of the current board so we can edit it
+    let boardCopy=[[],[],[],[],[],[],[],[],[]];
+    for (let i=0; i<9; i++) {
+      boardCopy[i] = board[i].slice();
     }
-    setBoard(boardCopy);
+    // Find a solution to the given board
+    solve(boardCopy, true);
+    // Check if we have a valid solution
+    if (solutions.length !== 0) {
+      // Display one of the solutions on the screen
+      console.log(solutions[0])
+      setBoard(solutions[0]); 
+      setTopText('Solution Found')
+    } else {
+      // Display error on page
+      setTopText('No Solution Found')
+    }
   }
 
   // Function to undo the last move a user made
@@ -174,13 +136,17 @@ function App() {
   })
 
   return (
-    <>
-      <div id='board'>
-        {largeSquares}
+    <><div id='game'>
+        <div id='top-text'>
+          {topText}
+        </div>
+        <div id='board'>
+          {largeSquares}
+        </div>
       </div>
       <div id='controls'>
         <button onClick={generateBoard}>New Board</button>
-        <button onClick={() => solve(board)}>Solve</button>
+        <button onClick={solveButton}>Solve</button>
         <button onClick={undo}>Undo</button>
         <button onClick={giveHint}>Hint</button>
       </div>
