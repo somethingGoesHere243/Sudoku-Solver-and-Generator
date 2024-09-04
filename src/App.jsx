@@ -22,7 +22,6 @@ const canPlace = (board, largeSquareIndex, smallSquareIndex, num) => {
       if (board[largeSquareColumnNumber + i][smallSquareColumnNumber + j] === num) {return false}
     }
   }
-  console.log(num)
   return true
 }
 
@@ -62,13 +61,44 @@ function App() {
 
   // Function to generate a random board with a single unique solution
   const generateBoard = () => {
-
+    // Start with empty board
+    let randomBoard = [[0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0]];
+    // Fill board with random digits ensuring board always has a solution
+    let done = false;
+    while (!done) {
+      // Get random position on board which hasnt been filled yet
+      let randomIndex1 = Math.floor(Math.random() * 9);
+      let randomIndex2 = Math.floor(Math.random() * 9);
+      while (randomBoard[randomIndex1][randomIndex2] !== 0) {
+        randomIndex1 = Math.floor(Math.random() * 9);
+        randomIndex2 = Math.floor(Math.random() * 9);
+      }
+      // Get random number to place in square
+      let randomDigit = Math.floor(Math.random() * 9) + 1;
+      // Check digit can be placed in requested square
+      while (!canPlace(randomBoard, randomIndex1, randomIndex2, randomDigit)) {
+        randomDigit = Math.floor(Math.random() * 9) + 1;
+      }
+      randomBoard[randomIndex1][randomIndex2] = randomDigit;
+      // Check board still has a solution
+      solutions = [];
+      solve(randomBoard, 2)
+      // If have only 1 solution stop adding numbers
+      if (solutions.length === 1) {
+        done = true;
+      } else if (solutions.length === 0) {
+        // If no solution remove digit and try again
+        randomBoard[randomIndex1][randomIndex2] = 0;
+      }
+    }
+    // Display board to screen
+    setBoard(randomBoard)
   }
 
   // Function to solve a given sudoku board and check if there are multiple solutions
-  const solve = (currBoard, wantOnlyOneSolution = false) => {
+  const solve = (currBoard, desiredNumberOfSolutions) => {
     // Check if we have a solution and can finish early
-    if (!(wantOnlyOneSolution && solutions.length >= 1)) {
+    if (solutions.length <= desiredNumberOfSolutions) {
       // Find the earliest square in board which has not been filled yet
       for (let i=0; i<9; i++) {
         for (let j=0; j<9; j++) {
@@ -77,10 +107,10 @@ function App() {
               // Check if newValue can be placed in desired position
               if (canPlace(currBoard, i, j, newValue)) {
                 currBoard[i][j] = newValue;
-                solve(currBoard , wantOnlyOneSolution);
+                solve(currBoard , desiredNumberOfSolutions);
+                currBoard[i][j] = 0;
               }
             }
-            currBoard[i][j] = 0;
             return
           }
         }
@@ -104,11 +134,10 @@ function App() {
       boardCopy[i] = board[i].slice();
     }
     // Find a solution to the given board
-    solve(boardCopy, true);
+    solve(boardCopy, 1);
     // Check if we have a valid solution
     if (solutions.length !== 0) {
       // Display one of the solutions on the screen
-      console.log(solutions[0])
       setBoard(solutions[0]); 
       setTopText('Solution Found')
     } else {
