@@ -25,6 +25,48 @@ const canPlace = (board, largeSquareIndex, smallSquareIndex, num) => {
   return true
 }
 
+// Function to find all the positions in a given square which could contain a given digit (given a list of available digits for each square)
+const checkSquare = (squareNumber, digit, availableDigits) => {
+  let res = [];
+  for (let i=0; i<9; i++) {
+    // Check if digit can be placed in this position
+    if (availableDigits[9 * squareNumber + i].includes(digit)) {
+      res.push(i);
+    }
+  }
+  return res;
+}
+
+// Function to find all the positions in a given row of a given board which could contain a given digit (given a list of available digits for each square)
+const checkRow = (rowNumber, digit, availableDigits) => {
+  let res = [];
+  for (let i=0; i<9; i++) {
+    // Convert to large and small square indices
+    const largeSquareIndex = Math.floor(rowNumber / 3) * 3 + Math.floor(i / 3);
+    const smallSquareIndex = (rowNumber % 3) * 3 + (i % 3);
+    // Check if digit can be placed in this position
+    if(availableDigits[9 * largeSquareIndex + smallSquareIndex].includes(digit)) {
+      res.push(i);
+    }
+  }
+  return res;
+}
+
+// Function to find all the positions in a given column of a given board which could contain a given digit (given a list of available digits for each square)
+const checkCol = (colNumber, digit, availableDigits) => {
+  let res = [];
+  for (let i=0; i<9; i++) {
+    // Convert to large and small square indices
+    const largeSquareIndex = Math.floor(i / 3) * 3 + Math.floor(colNumber / 3);
+    const smallSquareIndex = (i % 3) * 3 + (colNumber % 3);
+    // Check if digit can be placed in this position
+    if(availableDigits[9 * largeSquareIndex + smallSquareIndex].includes(digit)) {
+      res.push(i);
+    }
+  }
+  return res;
+}
+
 function Square({value, handleChange}) {
   return <input className='small-square' value={value ? value: ''} onChange={handleChange}></input>
 }
@@ -63,12 +105,27 @@ function App() {
   const generateBoard = () => {
     // Start with empty board
     let randomBoard = [[0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0]];
-    // Fill board with random digits ensuring board always has a solution
-    let done = false;
-    while (!done) {
+
+    // Add one of each digit to board in random locations (this will always have a solution)
+    for (let digit=1; digit<=9; digit++) {
       // Get random position on board which hasnt been filled yet
       let randomIndex1 = Math.floor(Math.random() * 9);
       let randomIndex2 = Math.floor(Math.random() * 9);
+      while (randomBoard[randomIndex1][randomIndex2] !== 0) {
+        randomIndex1 = Math.floor(Math.random() * 9);
+        randomIndex2 = Math.floor(Math.random() * 9);
+      }
+      // Set that square to the current digit
+      randomBoard[randomIndex1][randomIndex2] = digit;
+    }
+
+    // Fill board with 1 random digit at a time ensuring board always has a solution
+    let done = false;
+    let differingPosition = [Math.floor(Math.random() * 9), Math.floor(Math.random() * 9)];
+    while (!done) {
+      //Find position on board which hasnt been filled yet
+      let randomIndex1 = differingPosition[0];
+      let randomIndex2 = differingPosition[1];
       while (randomBoard[randomIndex1][randomIndex2] !== 0) {
         randomIndex1 = Math.floor(Math.random() * 9);
         randomIndex2 = Math.floor(Math.random() * 9);
@@ -89,6 +146,17 @@ function App() {
       } else if (solutions.length === 0) {
         // If no solution remove digit and try again
         randomBoard[randomIndex1][randomIndex2] = 0;
+      } else {
+        // Find a position on the board at which the 2 solutions differ
+        let foundPosition = false;
+        for(let i=0; i<63; i+=7) {
+          for(let j=0; j<9; j++) {
+            if (!foundPosition && solutions[0][j][i % 9] !== solutions[1][j][i % 9]) {
+              foundPosition = true;
+              differingPosition = [j,i % 9]
+            }
+          }
+        }
       }
     }
     // Display board to screen
@@ -99,28 +167,172 @@ function App() {
   const solve = (currBoard, desiredNumberOfSolutions) => {
     // Check if we have a solution and can finish early
     if (solutions.length <= desiredNumberOfSolutions) {
-      // Find the earliest square in board which has not been filled yet
+      // Track which squares we have changed the values of
+      const changedSquares = [];
+      // Find a list of the digits which could be placed in each square
+      const availableDigits = [];
+      for (let i=0; i<81; i++) {
+        if (currBoard[Math.floor(i / 9)][i % 9] === 0) {
+          availableDigits.push([]);
+        }
+        else {
+          availableDigits.push([currBoard[Math.floor(i / 9)][i % 9]])
+        }
+      }
       for (let i=0; i<9; i++) {
         for (let j=0; j<9; j++) {
           if (currBoard[i][j] === 0) {
             for (let newValue=1; newValue<=9; newValue++) {
               // Check if newValue can be placed in desired position
               if (canPlace(currBoard, i, j, newValue)) {
-                currBoard[i][j] = newValue;
-                solve(currBoard , desiredNumberOfSolutions);
-                currBoard[i][j] = 0;
+                availableDigits[9 * i + j].push(newValue);
               }
             }
-            return
+            // If no number can go in a square then board is invalid
+            if (availableDigits[9 * i + j].length === 0) {
+              // Unfill all squares we filled in this function call
+              changedSquares.forEach(([i,j]) => {
+                currBoard[i][j] = 0;
+              });
+
+              return
+            }
+            // If only one number could go in this square then put it there
+            if (availableDigits[9 * i + j].length === 1) {
+              currBoard[i][j] = availableDigits[9 * i + j][0];
+              changedSquares.push([i,j]);
+            }
           }
         }
       }
-      // If we reach this point then currBoard will be fully solved so create a copy and store it
-      let boardCopy = [];
-      for (let i=0; i<9; i++) {
-        boardCopy.push(currBoard[i].slice());
+
+      // Check each large square to see if there is a digit which can only be placed in one location
+      for (let squareNumber=0; squareNumber<9; squareNumber++) {
+        for (let digit=1; digit<=9; digit++) {
+          const availablePositions = checkSquare(squareNumber, digit, availableDigits);
+          // If only one available position for this digit then put it there
+          if (availablePositions.length === 1) {
+            // Check if position has not yet been filled and digit can still be placed here
+            if (currBoard[squareNumber][availablePositions[0]] === 0 && canPlace(currBoard, squareNumber, availablePositions[0], digit)) {
+              currBoard[squareNumber][availablePositions[0]] = digit;
+              changedSquares.push([squareNumber, availablePositions[0]]);
+              availableDigits[9 * squareNumber + availablePositions[0]] = [digit];
+            } else if (currBoard[squareNumber][availablePositions[0]] !== digit) {
+              // In this case we have no valid position to place digit so can return
+              // Unfill all squares we filled in this function call
+              changedSquares.forEach(([i,j]) => {
+                currBoard[i][j] = 0;
+              });
+              return
+            }
+          }
+        }
       }
-      solutions.push(boardCopy);
+
+      // Check each row to see if there is a digit which can only be placed in one location
+      for (let rowNumber=0; rowNumber<9; rowNumber++) {
+        for (let digit=1; digit<=9; digit++) {
+          const availablePositions = checkRow(rowNumber, digit, availableDigits);
+          // If only one available position for this digit then put it there
+          if (availablePositions.length === 1) {
+            // Convert to usual square indices
+            const largeSquareIndex = Math.floor(rowNumber / 3) * 3 + Math.floor(availablePositions[0] / 3);
+            const smallSquareIndex = (rowNumber % 3) * 3 + (availablePositions[0] % 3);
+            // Check if position has not yet been filled and digit can still be placed here
+            if (currBoard[largeSquareIndex][smallSquareIndex] === 0 && canPlace(currBoard, largeSquareIndex, smallSquareIndex, digit)) {
+              currBoard[largeSquareIndex][smallSquareIndex] = digit;
+              changedSquares.push([largeSquareIndex, smallSquareIndex]);
+              availableDigits[9 * largeSquareIndex + smallSquareIndex] = [digit];
+            } else if (currBoard[largeSquareIndex][smallSquareIndex] !== digit) {
+              // In this case we have no valid position to place digit so can return
+              // Unfill all squares we filled in this function call
+              changedSquares.forEach(([i,j]) => {
+                currBoard[i][j] = 0;
+              });
+              return
+            }
+          }
+        }
+      }
+
+      // Check each column to see if there is a digit which can only be placed in one location
+      for (let colNumber=0; colNumber<9; colNumber++) {
+        for (let digit=1; digit<=9; digit++) {
+          const availablePositions = checkCol(colNumber, digit, availableDigits);
+          // If only one available position for this digit then put it there
+          if (availablePositions.length === 1) {
+            // Convert to usual square indices
+            const largeSquareIndex = Math.floor(availablePositions[0] / 3) * 3 + Math.floor(colNumber / 3);
+            const smallSquareIndex = (availablePositions[0] % 3) * 3 + (colNumber % 3);
+            // Check if position has not yet been filled and digit can still be placed here
+            if (currBoard[largeSquareIndex][smallSquareIndex] === 0 && canPlace(currBoard, largeSquareIndex, smallSquareIndex, digit)) {
+              currBoard[largeSquareIndex][smallSquareIndex] = digit;
+              changedSquares.push([largeSquareIndex, smallSquareIndex]);
+              availableDigits[9 * largeSquareIndex + smallSquareIndex] = [digit];
+            } else if (currBoard[largeSquareIndex][smallSquareIndex] !== digit) {
+              // In this case we have no valid position to place digit so can return
+              // Unfill all squares we filled in this function call
+              changedSquares.forEach(([i,j]) => {
+                currBoard[i][j] = 0;
+              });
+              return
+            }
+          }
+        }
+      }
+
+      // If each position has only one available digit puzzle must be solved
+      if (availableDigits.every(arr => arr.length === 1)) {
+        let boardCopy = [];
+        for (let i=0; i<9; i++) {
+          boardCopy.push(currBoard[i].slice());
+        }
+        solutions.push(boardCopy);
+        // Unfill all squares we filled in this function call
+        changedSquares.forEach(([i,j]) => {
+          currBoard[i][j] = 0;
+        });
+
+        return 
+      }
+
+      // If a square has been filled re-call function to update availableDigits
+      if (changedSquares.length > 0) {
+        solve(currBoard, desiredNumberOfSolutions);
+        // Unfill all squares we filled in this function call
+        changedSquares.forEach(([i,j]) => {
+          currBoard[i][j] = 0;
+        });
+
+        return
+      }
+
+      // Fill squares starting with those which can be filled with the least possible digits
+      let numOfAvailableDigits = 2;
+      while (numOfAvailableDigits <= 9) {
+        const squareIndex = availableDigits.findIndex(arr => arr.length === numOfAvailableDigits);
+        if (squareIndex !== -1) {
+          // Convert index in availableDigitsCounts to indices needed to find square in currBoard
+          const i = Math.floor(squareIndex / 9);
+          const j = squareIndex % 9;
+          for (let newValue=1; newValue<=9; newValue++) {
+            // Check if newValue can be placed in desired position
+            if (canPlace(currBoard, i, j, newValue)) {
+              currBoard[i][j] = newValue;
+              solve(currBoard , desiredNumberOfSolutions);
+              currBoard[i][j] = 0;
+            }
+          }
+          // Unfill all squares we filled in this function call
+          changedSquares.forEach(([i,j]) => {
+            currBoard[i][j] = 0;
+          });
+          return
+        } else {
+          // If no square with the specified number of possible digits then increment this number
+          numOfAvailableDigits += 1;
+        }
+      }
     } 
   }
 
