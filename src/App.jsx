@@ -393,6 +393,9 @@ function App() {
 
   // Function to be ran when solve button pressed
   const solveButton = () => {
+    // Check if puzzle has already been solved
+    if (moveHistory.length !== 0 && moveHistory[0][0] === 'solved') {return}
+
     // Reset solutions list
     solutions = [];
     // Create a copy of the current board so we can edit it

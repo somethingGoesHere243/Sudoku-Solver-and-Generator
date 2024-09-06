@@ -85,9 +85,22 @@
   cursor: pointer;
 }
 
+@media (max-width: 1300px) {
+  #root{
+    flex-direction: column;
+    gap: 20px;
+  }
+}
+
 @media (max-width: 900px), (max-height: 900px) {
   .small-square{
     font-size: 2rem;
+  }
+}
+
+@media (max-height: 750px) {
+  #controls{
+    row-gap: 1rem;
   }
 }
 
@@ -95,7 +108,30 @@
   .small-square{
     font-size: 1.5rem;
   }
+
+  #controls > button {
+    width: 8rem;
+    height: 2rem;
+    font-size: 1.3rem;
+  }
 }
+
+@media (max-height: 550px) {
+  #root {
+    gap: 5px;
+  }
+
+  #controls{
+    row-gap: 0.5rem;
+  }
+
+  #controls > button {
+    width: 8rem;
+    height: 1.5rem;
+    font-size: 1rem;
+  }
+}
+
 
 @media (max-width: 450px), (max-height: 450px) {
   .small-square{
