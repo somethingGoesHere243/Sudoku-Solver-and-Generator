@@ -67,26 +67,51 @@ const checkCol = (colNumber, digit, availableDigits) => {
   return res;
 }
 
-function Square({value, handleChange}) {
-  return <input className='small-square' value={value ? value: ''} onChange={handleChange}></input>
+function Square({value, handleChange, backgroundColor}) {
+  return <input className='small-square' value={value ? value: ''} onChange={handleChange} style={{backgroundColor: backgroundColor}}></input>
 }
+
+// Store list of solutions for current board
+let solutions;
+
+// Store solution to most recently generated board
+let currSolution;
 
 function App() {
   // Store current state of board (a 0 implies a blank square)
   const [board, setBoard] = useState([[0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0]])
 
+  // Store most recently generated board as state
+  const [generatedBoard, setGeneratedBoard] = useState([[0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0]]) 
+
   // Store state for text to be displayed at top of screen
   const [topText, setTopText] = useState('');
 
-  // Store list of solutions for current board
-  let solutions = [];
+  // Add flag to see if the solver algorithm is taking too long to complete
+  let solverTooSlow = false;
 
   // Function to update a given square of the board
   const updateSquare = (largeSquareIndex, smallSquareIndex, value) => {
     // Check value is valid
     if (/^[1-9]$/.test(value) || value === '') {
-      // Check if value can be placed in desired square
-      if (canPlace(board, largeSquareIndex, smallSquareIndex, parseInt(value))) {
+      // Check if have a current solution
+      if (currSolution) {
+        // Check if the given input matches that solution
+        if (currSolution[largeSquareIndex][smallSquareIndex] === parseInt(value)) {
+          // Create copy of board and edit correct value
+          const boardCopy = board.slice();
+          const rowCopy = board[largeSquareIndex].slice();
+          rowCopy[smallSquareIndex] = parseInt(value) || 0;
+          boardCopy[largeSquareIndex] = rowCopy;
+
+          setBoard(boardCopy);
+          setTopText(``);
+        } else {
+          setTopText(`Placing ${value} here is a mistake.`)
+        }
+      } 
+      // If we dont have a current solution check if the input could be placed in the given square
+      else if (!currSolution && canPlace(board, largeSquareIndex, smallSquareIndex, parseInt(value))) {
         // Create copy of board and edit correct value
         const boardCopy = board.slice();
         const rowCopy = board[largeSquareIndex].slice();
@@ -94,8 +119,8 @@ function App() {
         boardCopy[largeSquareIndex] = rowCopy;
 
         setBoard(boardCopy);
+        setTopText(``);
       } else {
-        // Display error
         setTopText(`${value} can not be placed here`);
       }
     }
@@ -139,7 +164,15 @@ function App() {
       randomBoard[randomIndex1][randomIndex2] = randomDigit;
       // Check board still has a solution
       solutions = [];
-      solve(randomBoard, 2)
+      // Add time limit to make sure algorithm doesnt run too long
+      const startTime = new Date();
+      solverTooSlow = false;
+      solve(randomBoard, 2, startTime);
+      if (solverTooSlow) {
+        // Restart board generation
+        generateBoard();
+        return;
+      }
       // If have only 1 solution stop adding numbers
       if (solutions.length === 1) {
         done = true;
@@ -161,10 +194,20 @@ function App() {
     }
     // Display board to screen
     setBoard(randomBoard)
+    setGeneratedBoard(randomBoard)
+    // Store current solution
+    currSolution = solutions[0];
   }
 
   // Function to solve a given sudoku board and check if there are multiple solutions
-  const solve = (currBoard, desiredNumberOfSolutions) => {
+  const solve = (currBoard, desiredNumberOfSolutions, startTime = 0) => {
+    // Check how much time has passed since solver started
+    const currTime = new Date();
+    if (currTime - startTime > 1000 && startTime !== 0) {
+      // If over a second has passed terminate solver
+      solverTooSlow = true;
+      return;
+    }
     // Check if we have a solution and can finish early
     if (solutions.length <= desiredNumberOfSolutions) {
       // Track which squares we have changed the values of
@@ -298,7 +341,7 @@ function App() {
 
       // If a square has been filled re-call function to update availableDigits
       if (changedSquares.length > 0) {
-        solve(currBoard, desiredNumberOfSolutions);
+        solve(currBoard, desiredNumberOfSolutions, startTime);
         // Unfill all squares we filled in this function call
         changedSquares.forEach(([i,j]) => {
           currBoard[i][j] = 0;
@@ -319,7 +362,7 @@ function App() {
             // Check if newValue can be placed in desired position
             if (canPlace(currBoard, i, j, newValue)) {
               currBoard[i][j] = newValue;
-              solve(currBoard , desiredNumberOfSolutions);
+              solve(currBoard , desiredNumberOfSolutions, startTime);
               currBoard[i][j] = 0;
             }
           }
@@ -371,7 +414,14 @@ function App() {
   // Generate all squares of board
   const largeSquares = board.map((largeSquare, largeSquareIndex) => {
     const smallSquares = largeSquare.map((smallSquare, smallSquareIndex) => {
-      return <Square key={`Large Square-${largeSquareIndex}, Small Square-${smallSquareIndex}`} value={smallSquare} handleChange={e => {updateSquare(largeSquareIndex, smallSquareIndex, e.target.value)}}/>;
+      let backgroundColor = '#ffffff';
+      let handleChange = e => {updateSquare(largeSquareIndex, smallSquareIndex, e.target.value)}
+      // If a square is part of the most recently generated board give it different background color and prevent it from being updated
+      if (generatedBoard[largeSquareIndex][smallSquareIndex] !== 0) {
+        backgroundColor = '#d2f8fa';
+        handleChange = e => {};
+      }
+      return <Square key={`Large Square-${largeSquareIndex}, Small Square-${smallSquareIndex}`} value={smallSquare} handleChange={handleChange} backgroundColor={backgroundColor}/>;
     })
     return <div key={`Large Square-${largeSquareIndex}`} className='large-square'>{smallSquares}</div> 
   })
