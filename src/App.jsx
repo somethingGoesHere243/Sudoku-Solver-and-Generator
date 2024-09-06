@@ -72,10 +72,13 @@ function Square({value, handleChange, backgroundColor}) {
 }
 
 // Store list of solutions for current board
-let solutions;
+let solutions = [];
 
 // Store solution to most recently generated board
 let currSolution;
+
+// Store list of moves made by user (in the form [largeSquareIndex, smallSquareIndex, digit] or ['solved', previousBoardState])
+let moveHistory = [];
 
 function App() {
   // Store current state of board (a 0 implies a blank square)
@@ -104,6 +107,9 @@ function App() {
           rowCopy[smallSquareIndex] = parseInt(value) || 0;
           boardCopy[largeSquareIndex] = rowCopy;
 
+          // Update move history
+          moveHistory.unshift([largeSquareIndex, smallSquareIndex, parseInt(value) || 0])
+
           setBoard(boardCopy);
           setTopText(``);
         } else {
@@ -117,6 +123,9 @@ function App() {
         const rowCopy = board[largeSquareIndex].slice();
         rowCopy[smallSquareIndex] = parseInt(value) || 0;
         boardCopy[largeSquareIndex] = rowCopy;
+
+        // Update move history
+        moveHistory.unshift([largeSquareIndex, smallSquareIndex, parseInt(value) || 0])
 
         setBoard(boardCopy);
         setTopText(``);
@@ -195,8 +204,11 @@ function App() {
     // Display board to screen
     setBoard(randomBoard)
     setGeneratedBoard(randomBoard)
+    setTopText('New Board Generated')
     // Store current solution
     currSolution = solutions[0];
+    // Reset move history
+    moveHistory = [];
   }
 
   // Function to solve a given sudoku board and check if there are multiple solutions
@@ -392,6 +404,9 @@ function App() {
     solve(boardCopy, 1);
     // Check if we have a valid solution
     if (solutions.length !== 0) {
+      // Update move history
+      moveHistory.unshift(['solved', board])
+
       // Display one of the solutions on the screen
       setBoard(solutions[0]); 
       setTopText('Solution Found')
@@ -403,12 +418,54 @@ function App() {
 
   // Function to undo the last move a user made
   const undo = () => {
-
+    // Check we have a move to undo
+    if (moveHistory.length > 0) {
+      let undoneMove = moveHistory.shift();
+      // If the previous move was pressing the solve button we must return board to its previous state
+      if (undoneMove[0] === 'solved') {
+        setBoard(undoneMove[1]);
+      }
+      // Otherwise check if second previous move is affecting the same square
+      else if (moveHistory.length > 0 && moveHistory[0][0] === undoneMove[0] && moveHistory[0][1] === undoneMove[1]) {
+        // Edit square to match second previous move
+        const boardCopy = board.slice();
+        boardCopy[undoneMove[0]][undoneMove[1]] = moveHistory[0][2];
+        console.log(boardCopy)
+        setBoard(boardCopy);
+      } 
+      // Otherwise empty the square affected by undone move
+      else {
+        const boardCopy = board.slice();
+        boardCopy[undoneMove[0]][undoneMove[1]] = 0;
+        console.log(boardCopy)
+        setBoard(boardCopy);
+      }
+    }
   }
 
   // Function to correctly place a single digit on the current board
   const giveHint = () => {
+    // Ensure we have a solution to the board
+    let solution;
+    if (!currSolution) {
+      solve(board, 1)
+      solution = solutions[0];
+    } else {
+      solution = currSolution
+    }
+    // Check if puzzle is already solved
+    if (String(solution) === String(board)) {return;}
 
+    // Find random square on board which has yet to be filled
+    let randomIndex1 = Math.floor(Math.random() * 9);
+    let randomIndex2 = Math.floor(Math.random() * 9);
+    while (board[randomIndex1][randomIndex2] !== 0) {
+      randomIndex1 = Math.floor(Math.random() * 9);
+      randomIndex2 = Math.floor(Math.random() * 9);
+    }
+    let correctDigit = solution[randomIndex1][randomIndex2];
+    updateSquare(randomIndex1, randomIndex2, correctDigit);
+    setTopText('Hint Given')
   }
 
   // Generate all squares of board
